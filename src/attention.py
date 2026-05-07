@@ -1,3 +1,7 @@
+"""Scaled dot-product and multi-head attention."""
+
+from __future__ import annotations
+
 import math
 from typing import Optional, Tuple
 
@@ -5,29 +9,48 @@ import torch
 from torch import nn
 
 
-class ScaledDotProductAttention(nn.Module):
-    def forward(
-        self,
-        query: torch.Tensor,
-        key: torch.Tensor,
-        value: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        d_k = query.size(-1)
-        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+def scaled_dot_product_attention(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    mask: Optional[torch.Tensor] = None,
+    dropout: Optional[nn.Dropout] = None,
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """Compute Attention(Q,K,V) = softmax(QK^T / sqrt(d_k))V.
 
-        if mask is not None:
-            if mask.dtype == torch.bool:
-                scores = scores.masked_fill(~mask, float("-inf"))
-            else:
-                scores = scores.masked_fill(mask == 0, float("-inf"))
+    Args:
+        query: Tensor of shape ``(batch, heads, query_len, d_k)``.
+        key: Tensor of shape ``(batch, heads, key_len, d_k)``.
+        value: Tensor of shape ``(batch, heads, key_len, d_v)``.
+        mask: Optional broadcastable mask where True/1 means attend and False/0 means block.
+        dropout: Optional dropout module applied to attention weights.
 
-        attention_weights = torch.softmax(scores, dim=-1)
-        output = torch.matmul(attention_weights, value)
-        return output, attention_weights
+    Returns:
+        A pair ``(output, attention_weights)`` with shapes
+        ``(batch, heads, query_len, d_v)`` and ``(batch, heads, query_len, key_len)``.
+    """
+
+    d_k = query.size(-1)
+    scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
+
+    if mask is not None:
+        mask = mask.to(device=scores.device)
+        if mask.dtype == torch.bool:
+            scores = scores.masked_fill(~mask, float("-inf"))
+        else:
+            scores = scores.masked_fill(mask == 0, float("-inf"))
+
+    weights = torch.softmax(scores, dim=-1)
+    if dropout is not None:
+        weights = dropout(weights)
+
+    output = torch.matmul(weights, value)
+    return output, weights
 
 
 class MultiHeadAttention(nn.Module):
+    """Multi-head attention mechanism from "Attention Is All You Need"."""
+
     def __init__(self, d_model: int = 512, h: int = 8, dropout: float = 0.1) -> None:
         super().__init__()
         if d_model % h != 0:
@@ -42,7 +65,6 @@ class MultiHeadAttention(nn.Module):
         self.v_proj = nn.Linear(d_model, d_model)
         self.out_proj = nn.Linear(d_model, d_model)
 
-        self.attention = ScaledDotProductAttention()
         self.dropout = nn.Dropout(dropout)
 
     def _split_heads(self, x: torch.Tensor) -> torch.Tensor:
@@ -68,8 +90,8 @@ class MultiHeadAttention(nn.Module):
         v = self._split_heads(self.v_proj(value))
 
         prepared_mask = self._prepare_mask(mask) if mask is not None else None
-        attended, weights = self.attention(q, k, v, prepared_mask)
+        attended, weights = scaled_dot_product_attention(q, k, v, mask=prepared_mask, dropout=self.dropout)
 
         attended = attended.transpose(1, 2).contiguous().view(query.size(0), query.size(1), self.d_model)
-        output = self.out_proj(self.dropout(attended))
+        output = self.out_proj(attended)
         return output, weights
