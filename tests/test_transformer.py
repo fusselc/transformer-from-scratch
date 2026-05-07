@@ -52,12 +52,14 @@ def test_default_memory_mask_blocks_source_padding() -> None:
     )
     src = torch.tensor([[7, 8, 0, 0]])
     tgt = torch.tensor([[1, 9, 10, 11]])
+    pad_start_idx = 2
 
-    _, attention_info = model(src, tgt, return_attention=True)
+    probs, attention_info = model(src, tgt, return_attention=True)
+    assert probs.shape == (1, 4, 40)
 
     for layer_cross_attention in attention_info["decoder_cross"]:
         assert torch.allclose(
-            layer_cross_attention[..., 2:],
-            torch.zeros_like(layer_cross_attention[..., 2:]),
+            layer_cross_attention[..., pad_start_idx:],
+            torch.zeros_like(layer_cross_attention[..., pad_start_idx:]),
             atol=1e-6,
         )
