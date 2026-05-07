@@ -81,7 +81,7 @@ class Transformer(nn.Module):
             memory,
             tgt_mask=tgt_mask,
             memory_mask=memory_mask,
-        )        
+        )
 
         logits = self.output_projection(decoder_output)
         output = logits if return_logits else self.softmax(logits)
