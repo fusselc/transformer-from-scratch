@@ -49,10 +49,28 @@ def scaled_dot_product_attention(
 
 
 class MultiHeadAttention(nn.Module):
-    """Multi-head attention mechanism from "Attention Is All You Need"."""
+    """Multi-head attention mechanism from "Attention Is All You Need".
 
-    def __init__(self, d_model: int = 512, h: int = 8, dropout: float = 0.1) -> None:
+    Notes:
+        This implementation accepts both ``h`` and ``num_heads`` for convenience.
+        If both are provided, they must match.
+    """
+
+    def __init__(
+        self,
+        d_model: int = 512,
+        h: int = 8,
+        dropout: float = 0.1,
+        *,
+        num_heads: Optional[int] = None,
+    ) -> None:
         super().__init__()
+
+        if num_heads is not None:
+            if h != 8 and h != num_heads:
+                raise ValueError("If both h and num_heads are provided, they must match")
+            h = num_heads
+
         if d_model % h != 0:
             raise ValueError("d_model must be divisible by number of heads")
 
