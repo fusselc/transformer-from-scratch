@@ -38,7 +38,7 @@ def test_transformer_forward_probabilities_and_gradients() -> None:
     assert has_grad
 
 
-def test_transformer_default_memory_mask_blocks_source_padding_in_cross_attention() -> None:
+def test_default_memory_mask_blocks_source_padding() -> None:
     model = Transformer(
         src_vocab_size=40,
         tgt_vocab_size=40,
