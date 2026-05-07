@@ -36,3 +36,28 @@ def test_transformer_forward_probabilities_and_gradients() -> None:
     loss.backward()
     has_grad = any(p.grad is not None for p in model.parameters() if p.requires_grad)
     assert has_grad
+
+
+def test_transformer_default_memory_mask_blocks_source_padding_in_cross_attention() -> None:
+    model = Transformer(
+        src_vocab_size=40,
+        tgt_vocab_size=40,
+        d_model=32,
+        h=8,
+        num_encoder_layers=2,
+        num_decoder_layers=2,
+        d_ff=64,
+        dropout=0.0,
+        pad_token_id=0,
+    )
+    src = torch.tensor([[7, 8, 0, 0]])
+    tgt = torch.tensor([[1, 9, 10, 11]])
+
+    _, attention_info = model(src, tgt, return_attention=True)
+
+    for layer_cross_attention in attention_info["decoder_cross"]:
+        assert torch.allclose(
+            layer_cross_attention[..., 2:],
+            torch.zeros_like(layer_cross_attention[..., 2:]),
+            atol=1e-6,
+        )

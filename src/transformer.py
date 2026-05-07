@@ -71,6 +71,7 @@ class Transformer(nn.Module):
     ) -> Any:
         src_mask = src_mask if src_mask is not None else self.make_src_mask(src_tokens)
         tgt_mask = tgt_mask if tgt_mask is not None else self.make_tgt_mask(tgt_tokens)
+        memory_mask = memory_mask if memory_mask is not None else src_mask
 
         src_embedded = self.src_embedding(src_tokens)
         tgt_embedded = self.tgt_embedding(tgt_tokens)
