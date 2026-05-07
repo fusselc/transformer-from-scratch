@@ -66,6 +66,7 @@ class Transformer(nn.Module):
         src_mask: Optional[torch.Tensor] = None,
         tgt_mask: Optional[torch.Tensor] = None,
         memory_mask: Optional[torch.Tensor] = None,
+        return_logits: bool = False,
         return_attention: bool = False,
     ) -> Any:
         src_mask = src_mask if src_mask is not None else self.make_src_mask(src_tokens)
@@ -80,17 +81,17 @@ class Transformer(nn.Module):
             memory,
             tgt_mask=tgt_mask,
             memory_mask=memory_mask,
-        )
+        )        
 
         logits = self.output_projection(decoder_output)
-        probabilities = self.softmax(logits)
+        output = logits if return_logits else self.softmax(logits)
 
         if not return_attention:
-            return probabilities
+            return output
 
         attention_info: Dict[str, Any] = {
             "encoder": encoder_attention,
             "decoder_self": decoder_self_attention,
             "decoder_cross": decoder_cross_attention,
         }
-        return probabilities, attention_info
+        return output, attention_info

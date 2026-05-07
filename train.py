@@ -15,6 +15,7 @@ def build_copy_batch(
     bos_token_id: int,
     device: torch.device,
 ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    # Keep 0 as PAD and 1 as BOS; sample content tokens from [2, vocab_size).
     src = torch.randint(2, vocab_size, (batch_size, seq_len), device=device)
     tgt_input = torch.cat([torch.full((batch_size, 1), bos_token_id, device=device), src[:, :-1]], dim=1)
     tgt_output = src
@@ -38,23 +39,21 @@ def train_copy_task(steps: int = 200, batch_size: int = 32, seq_len: int = 12, v
     ).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1.0, betas=(0.9, 0.98), eps=1e-9)
-    loss_fn = nn.NLLLoss()
+    loss_fn = nn.CrossEntropyLoss()
 
     model.train()
     for step in range(1, steps + 1):
         src, tgt_in, tgt_out = build_copy_batch(batch_size, seq_len, vocab_size, bos_token_id, device)
 
-        probabilities = model(src, tgt_in)
-        log_probabilities = torch.log(probabilities + 1e-9)
-        loss = loss_fn(log_probabilities.view(-1, vocab_size), tgt_out.reshape(-1))
+        logits = model(src, tgt_in, return_logits=True)
+        loss = loss_fn(logits.view(-1, vocab_size), tgt_out.reshape(-1))
 
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
-
         lr = transformer_learning_rate(step, d_model=128, warmup=4000)
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
+        optimizer.step()
 
         if step % 20 == 0 or step == 1:
             print(f"step={step:04d} loss={loss.item():.4f} lr={lr:.8f}")
